@@ -370,6 +370,8 @@ nandesk/
 | [Adriano] | Desenvolvimento Backend — Score Engine, Open Finance, Fraud |
 | [Fernando] | Desenvolvimento Frontend — UI/UX, Dashboard, Landing Page |
 | [Erick] | Pesquisa & Documentação — Análise de mercado, Pitch, Arquitetura |
+| [italo] |  — desenvolvedor backend - Arquitetura |
+| [leonardo] | desolvedor frontend — Análise de mercado, Arquitetura |
 
 ---
 
