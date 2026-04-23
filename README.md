@@ -368,11 +368,11 @@ nandesk/
 | Nome | Papel |
 |------|-------|
 | [Adriano] | Desenvolvimento Backend — Score Engine, Open Finance, Fraud |
-| [Fernando] | Desenvolvimento Frontend — UI/UX, Dashboard, Landing Page |
+| [Fernando] | Desenvolvimento Frontend, Dashboard, Landing Page, Pesquisa |
 | [Erick] | Pesquisa & Documentação — Análise de mercado, Pitch, Arquitetura |
-| [Italo] |  — desenvolvedor backend - Arquitetura |
-| [Leonardo] | desolvedor frontend — Análise de mercado, Arquitetura |
-| [Arthur] | Pesquisa & Documentação — Análise de mercado, Pitch, Arquitetura |
+| [Italo] | Ideia do projeto - Arquitetura |
+| [Leonardo] | Componentes, Integração com API |
+| [Arthur] | Deploy, Testes |
 
 ---
 
