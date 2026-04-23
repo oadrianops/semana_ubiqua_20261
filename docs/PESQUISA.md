@@ -134,4 +134,4 @@ Para o MVP/hackathon, usamos um mock determinístico por CPF que simula os dados
 
 ---
 
-*Pesquisa compilada por [Nome do Integrante] — Hackathon Semana Ubíqua, UNAMA 2026*
+*Pesquisa compilada por Fernando Noronha — Hackathon Semana Ubíqua, UNAMA 2026*
