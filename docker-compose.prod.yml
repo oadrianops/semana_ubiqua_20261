@@ -1,0 +1,55 @@
+# Docker Compose para Coolify — nandesk.com.br
+# Coolify injeta as envs via UI. Domains são configurados via labels Traefik do próprio Coolify.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nandesk}
+      POSTGRES_USER: ${POSTGRES_USER:-nandesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nandesk}"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nandesk}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nandesk}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://nandesk.com.br}
+    expose:
+      - "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # Coolify irá rotear api.nandesk.com.br → backend:3001 via labels do Traefik
+    labels:
+      - coolify.managed=true
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.nandesk.com.br/api}
+    expose:
+      - "4173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # Coolify irá rotear nandesk.com.br → frontend:4173
+    labels:
+      - coolify.managed=true
+
+volumes:
+  postgres_data:

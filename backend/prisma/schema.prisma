@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  cpf               String   @unique
+  name              String
+  email             String   @unique
+  phone             String
+  passwordHash      String
+  deviceFingerprint String?
+  lastLoginIp       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  consents        Consent[]
+  bankConnections BankConnection[]
+  scoreHistory    ScoreHistory[]
+  creditRequests  CreditRequest[]
+  fraudFlags      FraudFlag[]
+
+  @@index([deviceFingerprint])
+  @@index([lastLoginIp])
+}
+
+model Consent {
+  id        String    @id @default(cuid())
+  userId    String
+  category  String
+  granted   Boolean   @default(false)
+  grantedAt DateTime?
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+}
+
+model BankConnection {
+  id          String   @id @default(cuid())
+  userId      String
+  institution String
+  connectedAt DateTime @default(now())
+  status      String   @default("active")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  connectionId String
+  date         DateTime
+  amount       Float
+  description  String
+  category     String
+  isCircular   Boolean  @default(false)
+
+  connection BankConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, date])
+}
+
+model ScoreHistory {
+  id               String   @id @default(cuid())
+  userId           String
+  score            Int
+  regularityScore  Float
+  volumeScore      Float
+  behaviorScore    Float
+  paymentScore     Float
+  alternativeScore Float
+  creditLimit      Float
+  decision         String
+  explanationText  String   @db.Text
+  calculatedAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, calculatedAt])
+}
+
+model CreditRequest {
+  id              String    @id @default(cuid())
+  userId          String
+  requestedAmount Float
+  approvedAmount  Float?
+  installments    Int
+  monthlyRate     Float
+  totalAmount     Float?
+  status          String    @default("pending")
+  scoreAtRequest  Int
+  pixKey          String?
+  requestedAt     DateTime  @default(now())
+  approvedAt      DateTime?
+  disbursedAt     DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  creditRequestId String
+  installmentNo   Int
+  dueDate         DateTime
+  amount          Float
+  paidAt          DateTime?
+  status          String    @default("pending")
+
+  creditRequest CreditRequest @relation(fields: [creditRequestId], references: [id], onDelete: Cascade)
+
+  @@index([creditRequestId])
+}
+
+model FraudFlag {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  severity  String
+  details   Json
+  createdAt DateTime @default(now())
+  resolved  Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+}
