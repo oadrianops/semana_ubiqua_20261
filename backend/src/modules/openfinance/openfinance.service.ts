@@ -13,7 +13,7 @@ export class OpenFinanceService {
 
   async getConnections(userId: string) {
     return prisma.bankConnection.findMany({
-      where: { userId },
+      where: { userId, status: 'active' },
       include: { _count: { select: { transactions: true } } },
       orderBy: { connectedAt: 'desc' },
     });
