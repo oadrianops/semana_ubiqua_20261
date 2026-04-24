@@ -56,7 +56,24 @@ export class ScoreService {
     const transactions = connections.flatMap((c) => c.transactions);
 
     if (transactions.length === 0) {
-      return this.noDataResult();
+      const result = this.noDataResult();
+      if (persist) {
+        await prisma.scoreHistory.create({
+          data: {
+            userId,
+            score: 0,
+            regularityScore: 0,
+            volumeScore: 0,
+            behaviorScore: 0,
+            paymentScore: 0,
+            alternativeScore: 0,
+            creditLimit: 0,
+            decision: 'denied',
+            explanationText: result.explanationText,
+          },
+        });
+      }
+      return result;
     }
 
     const components = this.computeComponents(transactions);

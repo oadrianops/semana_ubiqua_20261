@@ -5,6 +5,7 @@ import {
   detectCircularTransactions,
   SUPPORTED_INSTITUTIONS,
 } from './mock-data.generator';
+import { scoreService } from '../score/score.service';
 
 export class OpenFinanceService {
   listInstitutions() {
@@ -88,6 +89,10 @@ export class OpenFinanceService {
       where: { id: connectionId },
       data: { status: 'disconnected' },
     });
+
+    // Recalcula e persiste o score refletindo a remoção do banco
+    await scoreService.calculate(userId, true);
+
     return { success: true };
   }
 
