@@ -68,4 +68,23 @@ export const creditController = {
       return next(err);
     }
   },
+
+  async overdue(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await creditService.getOverduePayments(req.userId!);
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  },
+
+  async upcoming(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const daysAhead = req.query.days ? Number(req.query.days) : 7;
+      const result = await creditService.getUpcomingPayments(req.userId!, daysAhead);
+      return res.json(result);
+    } catch (err) {
+      return next(err);
+    }
+  },
 };

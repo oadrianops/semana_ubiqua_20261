@@ -41,6 +41,39 @@ export class FraudService {
   }
 
   /**
+   * Verifica correlação por IP entre múltiplos usuários.
+   * Requisito da Entrevista 8 (Segurança): identificar múltiplos cadastros
+   * vindos do mesmo ponto de rede mesmo quando o fingerprint muda.
+   */
+  async scanDuplicateIPs(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.lastLoginIp) return [];
+
+    const sameIp = await prisma.user.findMany({
+      where: {
+        lastLoginIp: user.lastLoginIp,
+        id: { not: userId },
+      },
+      select: { id: true, cpf: true },
+    });
+
+    if (sameIp.length === 0) return [];
+
+    const flag = await prisma.fraudFlag.create({
+      data: {
+        userId,
+        type: 'duplicate_ip',
+        severity: sameIp.length >= 3 ? 'medium' : 'low',
+        details: {
+          ip: user.lastLoginIp,
+          relatedUsers: sameIp.length,
+        },
+      },
+    });
+    return [flag];
+  }
+
+  /**
    * Identifica padrões de renda circular em transações do usuário.
    */
   async scanCircularIncome(userId: string) {
@@ -69,11 +102,12 @@ export class FraudService {
   }
 
   async runFullScan(userId: string) {
-    const [dup, circ] = await Promise.all([
+    const [dupDevice, dupIp, circ] = await Promise.all([
       this.scanDuplicateDevices(userId),
+      this.scanDuplicateIPs(userId),
       this.scanCircularIncome(userId),
     ]);
-    return { flags: [...dup, ...circ] };
+    return { flags: [...dupDevice, ...dupIp, ...circ] };
   }
 }
 

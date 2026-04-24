@@ -143,6 +143,68 @@ export class CreditService {
     return request;
   }
 
+  /**
+   * Retorna parcelas vencidas (dueDate < hoje, status pending).
+   * Base para cobrança pós-crédito — Entrevista 10 (Operação).
+   */
+  async getOverduePayments(userId: string) {
+    const now = new Date();
+    const overdue = await prisma.payment.findMany({
+      where: {
+        status: 'pending',
+        dueDate: { lt: now },
+        creditRequest: { userId },
+      },
+      include: {
+        creditRequest: {
+          select: { id: true, requestedAmount: true, installments: true },
+        },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    return overdue.map((p) => ({
+      paymentId: p.id,
+      creditRequestId: p.creditRequestId,
+      installmentNo: p.installmentNo,
+      dueDate: p.dueDate,
+      amount: p.amount,
+      daysOverdue: Math.floor((now.getTime() - p.dueDate.getTime()) / (1000 * 60 * 60 * 24)),
+      creditTotalInstallments: p.creditRequest.installments,
+    }));
+  }
+
+  /**
+   * Parcelas a vencer nos próximos N dias (padrão 7).
+   * Alerta pré-inadimplência — Entrevista 10 (Operação).
+   */
+  async getUpcomingPayments(userId: string, daysAhead: number = 7) {
+    const now = new Date();
+    const horizon = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+
+    const upcoming = await prisma.payment.findMany({
+      where: {
+        status: 'pending',
+        dueDate: { gte: now, lte: horizon },
+        creditRequest: { userId },
+      },
+      include: {
+        creditRequest: { select: { id: true, installments: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    return upcoming.map((p) => ({
+      paymentId: p.id,
+      creditRequestId: p.creditRequestId,
+      installmentNo: p.installmentNo,
+      dueDate: p.dueDate,
+      amount: p.amount,
+      daysUntilDue: Math.ceil((p.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+      creditTotalInstallments: p.creditRequest.installments,
+    }));
+  }
+
   async payInstallment(userId: string, requestId: string, installmentNo: number) {
     const request = await prisma.creditRequest.findFirst({
       where: { id: requestId, userId },

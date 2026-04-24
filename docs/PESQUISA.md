@@ -134,4 +134,95 @@ Para o MVP/hackathon, usamos um mock determinístico por CPF que simula os dados
 
 ---
 
+## Entrevistas 7–12 — Achados Pós-Lançamento
+
+Simulação do cenário *"a plataforma foi lançada e apareceram problemas reais"*. Cada entrevista traduzida em um requisito concreto do produto.
+
+### 7. Head de Risco — Crise de Inadimplência
+
+> "Estamos aprovando gente que não paga. O modelo está muito permissivo."
+
+**Sintese:**
+- Falta contexto comportamental (padrão de uso, horário, consistência de localização)
+- Localização é sensível — precisa tratamento cuidadoso de privacidade
+- Score deve ser mais conservador e se ajustar ao comportamento ao longo do tempo
+
+**Impacto no NanDesk:**
+- Threshold de aprovação subiu de **700 → 750**; faixa de revisão 550–749
+- Múltiplos de renda reduzidos (3x → 2.5x na faixa alta; 1.5x → 1.2x na faixa média)
+- `alternativeScore` passou a incluir **consistência de horário** (entropia de 4 turnos de 6h) — deriva de transações consentidas, sem GPS
+- **Penalidade de tendência**: se os 3 últimos scores mostram queda > 50 pontos, aplica fator 0.95
+
+### 8. Segurança — Fraude Ativa
+
+> "Contas falsas sendo criadas em massa. Mesmo dispositivo, mesmo IP, às vezes mesmo CPF variando levemente."
+
+**Síntese:**
+- Correlação entre contas é essencial (device + IP + padrão)
+- Renda circular: usuários movimentando valores artificialmente para inflar score
+
+**Impacto no NanDesk:**
+- Novo scan `duplicate_ip` em `fraud.service.ts` (complementa `duplicate_device`)
+- `runFullScan` agora roda 3 varreduras em paralelo
+- Renda circular já estava marcada (`isCircular: true`) — mantido e reforçado no `paymentScore`
+
+### 9. Jurídico — Pressão de Usuários
+
+> "Os usuários querem saber por que foram negados. Não conseguimos explicar."
+
+**Síntese:**
+- Explicação obrigatória, simples, não-técnica
+- Exemplos aceitáveis: *"Seu histórico de movimentação indica instabilidade"*, *"Seu padrão de renda não é consistente"*
+- IA pode ser usada, mas precisa justificar a decisão
+- Dados novos (ex: localização) só com consentimento explícito
+
+**Impacto no NanDesk:**
+- `generateExplanation()` gera frases em PT-BR identificando a dimensão mais fraca
+- Texto persistido em `ScoreHistory` para auditoria (LGPD Art. 20)
+- Decisão explícita de **não usar GPS** — substituído por horário/dia-da-semana derivados do extrato consentido
+
+### 10. Operação — Cobrança e Recuperação
+
+> "Usuários param de pagar e a gente só descobre tarde. Precisamos de monitoramento pós-crédito."
+
+**Síntese:**
+- Alertas de risco antes do atraso
+- Reavaliação periódica de score
+- Suporte a negociação de dívida
+- Automação com controle humano
+
+**Impacto no NanDesk:**
+- Novos endpoints `GET /api/credit/overdue` e `GET /api/credit/upcoming?days=N`
+- Score pode ser recalculado sob demanda a qualquer momento; histórico imutável em `ScoreHistory`
+- **Próximo passo**: notificação automática (WhatsApp/email) 3 dias antes do vencimento e no dia do atraso
+
+### 11. Investidor — Escala
+
+> "Queremos milhões de usuários e expansão para outros países. Regulação e dados mudam."
+
+**Síntese:**
+- Escala horizontal
+- Arquitetura adaptável a outras jurisdições
+- Dados locais (regulação LGPD/GDPR/LFPDPPP)
+
+**Impacto no NanDesk:**
+- Monolito modular com módulos prontos para extração
+- Score Engine é o primeiro candidato a microserviço
+- Consent engine é agnóstico de jurisdição (basta mapear categorias)
+- Prisma + PostgreSQL suporta sharding por região no futuro
+
+### 12. Parceiro — Plataforma de Delivery
+
+> "Podemos fornecer indicadores processados, não dados brutos. Privacidade e estratégia."
+
+**Síntese:**
+- Acesso apenas a scores e métricas agregadas
+- Trade-off: perda de granularidade × ganho de conformidade
+
+**Impacto no NanDesk:**
+- Dimensão `alternativeScore` desenhada para receber score externo pré-processado
+- Arquitetura permite plugar novos provedores sem alterar o cálculo core
+
+---
+
 *Pesquisa compilada por Fernando Noronha — Hackathon Semana Ubíqua, UNAMA 2026*

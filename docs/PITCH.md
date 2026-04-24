@@ -79,33 +79,39 @@ Cenário: Open Finance
 | Volume de Movimentação | Quanto ele movimenta? | 25% |
 | Comportamento de Gastos | Ele poupa alguma coisa? | 20% |
 | Histórico de Pagamentos | Teve transações problemáticas? | 15% |
-| Dados Alternativos | Frequência, recência, padrão semanal | 10% |
+| Dados Alternativos | Frequência, recência, padrão semanal, consistência de horário e tendência temporal | 10% |
 
 > "E toda decisão tem uma explicação em linguagem simples. O João sabe exatamente o que fazer para melhorar o score dele."
+
+> "O score ainda aprende com o tempo: se os últimos resultados do João estão caindo, o sistema reduz automaticamente o valor liberado — é mais conservador, menos inadimplência."
 
 ---
 
 ### 3:30 – 4:00 | Diferenciais
 
 **1. Transparência**
-> "Diferente do Serasa, o NanScore é explicável. João sabe por que teve esse score e o que fazer para melhorar."
+> "Diferente do Serasa, o NanScore é explicável. O João sabe por que teve esse score e o que fazer para melhorar. Isso não é firula — é a LGPD Art. 20."
 
-**2. Anti-fraude**
-> "Detectamos automaticamente transações circulares — quando alguém tenta inflar a renda enviando dinheiro para si mesmo. E device fingerprinting identifica múltiplos cadastros no mesmo dispositivo."
+**2. Anti-fraude em 3 camadas**
+> "Correlacionamos contas por **device**, por **IP** e detectamos **renda circular** — quando alguém tenta inflar o extrato enviando dinheiro para si mesmo. Três scans rodam em paralelo a cada solicitação."
 
-**3. LGPD by design**
-> "Consentimento granular por categoria. Revogação a qualquer momento. Minimização de dados: não armazenamos transações brutas, só agregados."
+**3. Monitoramento pós-crédito**
+> "Não acaba na liberação. A API já entrega parcelas vencidas e parcelas a vencer nos próximos 7 dias — base para alerta antes do atraso e para a operação agir antes da inadimplência virar problema."
+
+**4. LGPD by design**
+> "Consentimento granular por categoria. Revogação a qualquer momento. Minimização de dados: não armazenamos transações brutas, só agregados. E nada de GPS — usamos só o que o usuário já autorizou."
 
 ---
 
 ### 4:00 – 4:30 | Stack e Arquitetura
 
-> "O NanDesk é um monolito modular — decisão consciente para hackathon, mas preparado para evoluir. Cada módulo (auth, open finance, score, crédito, fraude) pode ser extraído como microserviço quando o volume justificar."
+> "O NanDesk é um monolito modular — decisão consciente para hackathon, mas preparado para evoluir. Cada módulo (auth, open finance, score, crédito, fraude) pode ser extraído como microserviço quando o volume justificar. O Score Engine é o primeiro candidato quando escalarmos para milhões."
 
 - **Backend**: Node.js 22 + Express + Prisma + PostgreSQL
 - **Frontend**: React 18 + Vite + Tailwind
 - **Infra**: Docker + Coolify na VPS Oracle Cloud
 - **Domínio**: nandesk.com.br com SSL automático
+- **Escala internacional**: consent engine agnóstico de jurisdição (LGPD → GDPR → LFPDPPP)
 
 ---
 
@@ -132,6 +138,15 @@ Cenário: Open Finance
 
 **"O que diferencia de um banco digital como Nubank?"**
 > O Nubank usa score Serasa/Boa Vista, que ignora renda de autônomo. O NanDesk usa dados comportamentais do próprio extrato do usuário via Open Finance. João com 3 anos de Uber e R$ 4k/mês seria negado no Nubank e aprovado aqui.
+
+**"E se o modelo começar a aprovar gente que não paga?"**
+> É exatamente o cenário que modelamos (Entrevista 7 — Head de Risco). Subimos o threshold de aprovação de 700 para 750, reduzimos os múltiplos de renda e adicionamos **penalidade de tendência**: se o score do usuário vem caindo, o sistema se auto-ajusta para baixo. Mais conservador, sem perder transparência.
+
+**"E se criarem várias contas para driblar o score?"**
+> Três scans simultâneos (Entrevista 8 — Segurança): device fingerprint, IP e renda circular. Qualquer correlação gera `FraudFlag` com severity automática — visível no dashboard admin.
+
+**"E o pós-crédito? Como vocês sabem se o usuário está indo mal?"**
+> `GET /api/credit/overdue` e `GET /api/credit/upcoming` já entregam parcelas vencidas e a vencer (Entrevista 10 — Operação). A base para notificação pré-vencimento e cobrança está pronta; o próximo passo é plugar o canal (WhatsApp/email).
 
 ---
 

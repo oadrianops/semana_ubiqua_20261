@@ -15,6 +15,8 @@ router.use(authMiddleware);
 router.post('/simulate', creditController.simulate);
 router.post('/request', requestLimiter, creditController.request);
 router.get('/requests', creditController.list);
+router.get('/overdue', creditController.overdue);
+router.get('/upcoming', creditController.upcoming);
 router.get('/requests/:id', creditController.get);
 router.post('/requests/:id/pay', creditController.pay);
 

@@ -42,23 +42,23 @@ Tudo com **consentimento LGPD explícito** e **decisões auditáveis**.
 ┌─────────────────────────────────────────────────────────────┐
 │                     nandesk.com.br                          │
 │                                                             │
-│  ┌────────────────────┐      ┌─────────────────────────┐   │
-│  │  Frontend (React)  │◄────►│  Backend (Node + TS)    │   │
-│  │  Vite + Tailwind   │ HTTP │  Express + Zod          │   │
-│  │  React Query       │      │                         │   │
-│  │  Recharts          │      │  ┌─────────────────┐   │   │
-│  └────────────────────┘      │  │ Auth Module     │   │   │
-│                              │  │ Open Finance    │   │   │
-│                              │  │ Score Engine    │   │   │
-│                              │  │ Credit          │   │   │
-│                              │  │ Fraud           │   │   │
-│                              │  └────────┬────────┘   │   │
-│                              └───────────┼─────────────┘   │
-│                                          │                 │
-│                              ┌───────────▼─────────────┐   │
-│                              │  PostgreSQL 16          │   │
-│                              │  via Prisma ORM         │   │
-│                              └─────────────────────────┘   │
+│  ┌────────────────────┐      ┌─────────────────────────┐    │
+│  │  Frontend (React)  │◄────►│  Backend (Node + TS)    │    │
+│  │  Vite + Tailwind   │ HTTP │  Express + Zod          │    │
+│  │  React Query       │      │                         │    │
+│  │  Recharts          │      │  ┌─────────────────┐    │    │
+│  └────────────────────┘      │  │ Auth Module     │    │    │
+│                              │  │ Open Finance    │    │    │
+│                              │  │ Score Engine    │    │    │
+│                              │  │ Credit          │    │    │
+│                              │  │ Fraud           │    │    │
+│                              │  └────────┬────────┘    │    │
+│                              └───────────┼─────────────┘    │
+│                                          │                  │
+│                              ┌───────────▼─────────────┐    │
+│                              │  PostgreSQL 16          │    │
+│                              │  via Prisma ORM         │    │
+│                              └─────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,17 +100,19 @@ NanScore = (
 | **Volume de Movimentação** | Renda média mensal normalizada (escala até R$ 10k) | 25% |
 | **Comportamento de Gastos** | Taxa de poupança (entrada - saída) / entrada | 20% |
 | **Histórico de Pagamentos** | Penaliza transações devolvidas, estornadas e circulares | 15% |
-| **Dados Alternativos** | Consistência de atividade (frequência, recência, distribuição semanal) | 10% |
+| **Dados Alternativos** | Comportamento: frequência, recência, distribuição semanal, **consistência de horário** e **tendência temporal** | 10% |
 
 ### Regras de Decisão
 
 | NanScore | Decisão | Limite de Crédito | Taxa Mensal |
 |----------|---------|------------------|-------------|
 | 850-1000 | ✅ Aprovado automático | Até 3x renda mensal | 2.5% |
-| 700-849 | ✅ Aprovado automático | Até 3x renda mensal | 3.9% |
-| 500-699 | 🔁 Aprovado em revisão | Até 1.5x renda mensal | 5.9% |
-| 300-499 | 🔄 Lista de espera | — | — |
+| 750-849 | ✅ Aprovado automático | Até 2.5x renda mensal | 3.9% |
+| 550-749 | 🔁 Aprovado em revisão | Até 1.2x renda mensal | 5.9% |
+| 300-549 | 🔄 Lista de espera | — | — |
 | 0-299 | ❌ Negado | — | — |
+
+> 📉 **Faixas mais conservadoras após a Entrevista 7 (Head de Risco).** A aprovação automática subiu de 700 → 750 e os múltiplos de renda foram reduzidos para combater inadimplência pós-lançamento. Além disso, o NanScore passou a aplicar uma **penalidade de tendência**: se os últimos scores do usuário vêm caindo, o resultado é ajustado para baixo.
 
 ### Explicabilidade (LGPD Art. 20)
 
@@ -118,23 +120,83 @@ Toda decisão gera uma explicação humana. Exemplo real do sistema:
 
 > *"Seu NanScore é 642. Notamos histórico com transações problemáticas. Seu crédito está disponível com limite reduzido — mantenha sua movimentação ativa para melhorar nas próximas avaliações."*
 
-O sistema identifica automaticamente a dimensão mais fraca e traduz em linguagem acessível.
+Textos foram humanizados após a **Entrevista 9 (Jurídico)**: linguagem simples, sem jargão, sempre indicando o próximo passo concreto para o usuário. O sistema identifica a dimensão mais fraca e traduz em frases como *"seu padrão de renda não é consistente"* ou *"seu histórico de movimentação indica instabilidade"*.
 
 ---
 
 ## 🔐 Segurança e Anti-Fraude
 
-Com base nas entrevistas com o time de segurança e jurídico:
+Com base nas entrevistas com o time de segurança e jurídico (reforçadas na **Entrevista 8 — Fraude Ativa**):
 
 | Mecanismo | Implementação |
 |-----------|---------------|
 | **Device fingerprint** | Hash SHA-256 de user-agent + headers + resolução |
+| **Correlação por IP** | Scan cruza usuários com mesmo `lastLoginIp` — detecta múltiplas contas criadas do mesmo ponto |
 | **Rate limiting** | 10 logins/15min, 5 cadastros/hora, 3 solicitações/24h |
 | **Detecção de renda circular** | Marca transações com entrada+saída iguais em <24h |
 | **Flag de device duplicado** | Alerta se mesmo fingerprint em múltiplas contas |
 | **JWT + bcrypt** | Tokens com expiração, senhas com salt rounds 10 |
 | **Consentimento granular** | Por categoria, revogável a qualquer momento |
 | **Minimização de dados** | Só armazenamos o necessário; dados brutos são agregados |
+
+O endpoint `POST /api/fraud/scan` executa três varreduras em paralelo: `duplicate_device`, `duplicate_ip` e `circular_income`, gerando `FraudFlag` para cada ocorrência com severity automática.
+
+---
+
+## 📊 Monitoramento Pós-Crédito
+
+Introduzido após a **Entrevista 10 (Operação)**. O sistema agora acompanha o crédito depois da liberação:
+
+| Recurso | Endpoint | O que entrega |
+|---------|----------|---------------|
+| Parcelas vencidas | `GET /api/credit/overdue` | Lista de `Payment` com `status=pending` e `dueDate < hoje` — base para cobrança |
+| Parcelas a vencer | `GET /api/credit/upcoming` | Parcelas com vencimento em até 7 dias — alerta pré-inadimplência |
+| Reavaliação de score | `POST /api/score/calculate` | Recomputação sob demanda; histórico imutável em `ScoreHistory` permite comparar evolução |
+
+O score é recalculado a cada nova solicitação de crédito e pode ser re-disparado manualmente, fornecendo base para **alertas antes do atraso** e **reavaliação de risco contínua** conforme pedido pela Operação.
+
+---
+
+## 📈 Escalabilidade e Expansão
+
+Resposta à **Entrevista 11 (Investidor)**. A arquitetura atual é monolito modular, mas foi desenhada para crescer:
+
+- **Módulos isolados** (`auth`, `openfinance`, `score`, `credit`, `fraud`) podem ser extraídos como microserviços independentes sem refatoração — cada um já tem seu próprio `service`, `controller` e `routes`.
+- **Score Engine** é o primeiro candidato a virar serviço dedicado (alto custo computacional, escalabilidade horizontal).
+- **PostgreSQL com Prisma** permite shard por região (UF ou país) — essencial para expansão internacional, onde a regulação muda (LGPD BR → GDPR EU → LFPDPPP MX).
+- **Consent engine** já é agnóstico de jurisdição: basta mapear categorias para a lei local.
+- **Regras de decisão configuráveis**: thresholds, pesos e taxas centralizados em constantes para permitir A/B testing regional sem rebuild.
+
+---
+
+## 🤝 Integração com Parceiros
+
+Modelo desenhado após a **Entrevista 12 (Parceiro Delivery)**. Plataformas como iFood, Uber e Rappi não entregam dados brutos (privacidade + estratégia), mas podem fornecer **indicadores agregados**:
+
+- Score de desempenho do entregador/motorista
+- Tempo ativo na plataforma
+- Taxa de cancelamento
+
+No NanDesk, esses indicadores entrariam na dimensão **Dados Alternativos** (10% do peso) sem expor dados brutos. O schema já suporta isso — basta uma nova fonte alimentando o cálculo dentro de `calculateAlternativeScore()`.
+
+**Trade-off**: perdemos granularidade, mas ganhamos conformidade e viabilidade comercial.
+
+---
+
+## 📞 Entrevistas 7–12 — Evolução Pós-Lançamento
+
+Estas entrevistas simulam os **desafios reais após colocar a plataforma em operação** e foram decisivas para as mudanças atuais:
+
+| # | Stakeholder | Principal demanda | Onde cai no produto |
+|---|-------------|-------------------|---------------------|
+| 7 | Head de Risco | Score mais conservador e adaptativo ao tempo | Threshold de aprovação 700→750; penalidade por tendência negativa; consistência de horário em `alternativeScore` |
+| 8 | Segurança | Correlação de contas por device/IP; detectar renda artificial | `scanDuplicateDevices` + novo `scanDuplicateIPs` + `scanCircularIncome` rodando em `POST /api/fraud/scan` |
+| 9 | Jurídico | Explicação humana do "não" ao usuário | `generateExplanation()` em `score.service.ts` retorna texto em PT-BR simples por dimensão fraca, auditável em `ScoreHistory` |
+| 10 | Operação | Cobrança e recuperação de crédito | Novos endpoints `GET /api/credit/overdue` e `/upcoming` |
+| 11 | Investidor | Escalar para milhões + expansão internacional | Arquitetura modular pronta para split; consent engine agnóstico de jurisdição |
+| 12 | Parceiro (delivery) | Indicadores agregados, não dados brutos | Entrada prevista em `alternativeScore` — integração apenas com scores pré-processados dos parceiros |
+
+**Privacidade × Dados comportamentais** (Entrevistas 7 e 9): o Head de Risco queria localização para detectar inconsistência, mas o Jurídico vetou dados que ultrapassem o consentimento. Solução: usamos **horário de atividade e distribuição semanal** (já derivados das transações consentidas) em vez de GPS.
 
 ---
 
@@ -261,10 +323,12 @@ Todas as rotas autenticadas esperam header `Authorization: Bearer <jwt>`.
 - `GET /api/credit/requests` — listar
 - `GET /api/credit/requests/:id` — detalhes
 - `POST /api/credit/requests/:id/pay` — pagar parcela
+- `GET /api/credit/overdue` — parcelas vencidas do usuário (monitoramento pós-crédito)
+- `GET /api/credit/upcoming` — parcelas a vencer nos próximos 7 dias (alerta pré-inadimplência)
 
 ### Fraud
 - `GET /api/fraud/flags` — flags do usuário
-- `POST /api/fraud/scan` — executar scan completo
+- `POST /api/fraud/scan` — executar scan completo (device + IP + renda circular)
 
 ---
 
@@ -298,19 +362,21 @@ curl -X POST http://localhost:3001/api/credit/simulate \
 - **Mock Open Finance** — Dados bancários são gerados localmente. Integração real com BCB exigiria autorização regulatória.
 - **Sem Pix real** — Liberação é simbólica (status + timestamp).
 - **Score baseado em regras** — Sem ML. Funciona bem para MVP mas tende a ser menos preciso que um modelo treinado.
-- **Fraude básica** — Sem análise de grafos complexos nem modelos ML de fraude.
-- **Sem cobrança automatizada** — Pagamento é manual (botão "Pagar") no dashboard.
-- **Recálculo manual de score** — Não há recálculo automático agendado.
+- **Fraude básica** — Scans por device, IP e renda circular. Ainda sem análise de grafos complexos nem modelos ML de fraude.
+- **Cobrança sem automação de contato** — Detectamos parcelas vencidas via API, mas não há envio automático de notificação/WhatsApp.
+- **Recálculo manual de score** — O endpoint de cálculo existe e a tendência temporal é aplicada, mas não há job agendado diário.
+- **Integração real com parceiros** — O suporte a indicadores agregados (iFood/Uber) está no desenho, mas ainda não há conector.
 
 ## 🔮 Melhorias futuras
 
 - Integração real com PFAs (Provedores de Serviços de Iniciação/Agregação)
 - Modelo de ML explicável (ex: XGBoost + SHAP values para manter auditabilidade)
-- Cobrança automatizada + sistema de renegociação
-- Reavaliação de score programática (cron diário)
-- Dashboard admin com métricas de portfólio e alertas
-- Integração real com APIs de plataformas (Uber, iFood, 99) quando disponíveis
-- Split em microserviços quando volume justificar (começar por Score Engine)
+- Cobrança automatizada: notificação pré-venc (3d antes) + renegociação em-app a partir da 2ª parcela em atraso
+- Reavaliação de score programática (cron diário) com alerta se queda > 50 pts
+- Dashboard admin com métricas de portfólio, inadimplência e fraude
+- Conectores reais para indicadores de parceiros (iFood/Uber/Rappi) — respeitando o modelo de "score recebido" (Entrevista 12)
+- Split em microserviços quando volume justificar (começar por Score Engine — ver seção Escalabilidade)
+- Localização de jurisdição (GDPR, LFPDPPP) para expansão internacional
 
 ---
 

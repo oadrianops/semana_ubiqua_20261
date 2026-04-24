@@ -60,7 +60,10 @@ export class ScoreService {
     }
 
     const components = this.computeComponents(transactions);
-    const score = this.weightedScore(components);
+    const rawScore = this.weightedScore(components);
+    // Ajuste de tendência: score cai se os últimos 3 scores do usuário mostram queda (Entrevista 7 — Head de Risco)
+    const trendMultiplier = await this.getTrendMultiplier(userId);
+    const score = Math.round(rawScore * trendMultiplier);
     const avgIncome = this.averageMonthlyIncome(transactions);
     const creditLimit = this.calculateCreditLimit(score, avgIncome);
     const decision = this.makeDecision(score);
@@ -173,24 +176,45 @@ export class ScoreService {
     return monthly.reduce((a, b) => a + b, 0) / monthly.length;
   }
 
+  // Limites e decisões mais conservadores (Entrevista 7 — Head de Risco):
+  // aprovação automática agora em 750 (antes 700); múltiplos de renda reduzidos.
   private calculateCreditLimit(score: number, avgIncome: number): number {
-    if (score >= 700) return round(avgIncome * 3, 2);
-    if (score >= 500) return round(avgIncome * 1.5, 2);
+    if (score >= 850) return round(avgIncome * 3, 2);
+    if (score >= 750) return round(avgIncome * 2.5, 2);
+    if (score >= 550) return round(avgIncome * 1.2, 2);
     return 0;
   }
 
   private calculateRate(score: number): number {
     if (score >= 850) return 2.5;
-    if (score >= 700) return 3.9;
-    if (score >= 500) return 5.9;
+    if (score >= 750) return 3.9;
+    if (score >= 550) return 5.9;
     return 7.9;
   }
 
   private makeDecision(score: number): Decision {
-    if (score >= 700) return 'approved';
-    if (score >= 500) return 'review';
+    if (score >= 750) return 'approved';
+    if (score >= 550) return 'review';
     if (score >= 300) return 'waiting';
     return 'denied';
+  }
+
+  /**
+   * Aplica multiplicador de tendência temporal.
+   * Se os últimos 3 scores mostram queda > 50 pts entre primeiro e último, penaliza em 5%.
+   * Requisito da Entrevista 7 (Head de Risco): "que se ajuste ao comportamento ao longo do tempo".
+   */
+  private async getTrendMultiplier(userId: string): Promise<number> {
+    const recent = await prisma.scoreHistory.findMany({
+      where: { userId },
+      orderBy: { calculatedAt: 'desc' },
+      take: 3,
+      select: { score: true },
+    });
+    if (recent.length < 3) return 1;
+    // recent[0] é o mais novo; recent[2] é o mais antigo
+    const drop = recent[2].score - recent[0].score;
+    return drop > 50 ? 0.95 : 1;
   }
 
   private generateExplanation(
@@ -228,7 +252,7 @@ export class ScoreService {
   }
 
   private calculateAlternativeScore(transactions: Transaction[]): number {
-    // Mock: consistência de atividade (frequência + recência)
+    // Consistência de atividade (frequência + recência)
     const frequency = Math.min(transactions.length / 90, 1); // 1 tx/dia em 90 dias = max
     const recency = transactions.length > 0 ? 0.8 : 0;
 
@@ -241,7 +265,33 @@ export class ScoreService {
     const activeDays = Object.keys(dayDist).length;
     const dayConsistency = activeDays / 7;
 
-    return (frequency + recency + dayConsistency) / 3;
+    // Consistência de horário (Entrevista 7 — Head de Risco):
+    // horários concentrados em um turno indicam rotina de trabalho (bom);
+    // horários totalmente aleatórios indicam inconsistência (ruim).
+    // Calculamos a entropia normalizada sobre 4 turnos de 6h e invertemos.
+    const hourBuckets = [0, 0, 0, 0]; // 0-6, 6-12, 12-18, 18-24
+    transactions.forEach((t) => {
+      const h = new Date(t.date).getHours();
+      hourBuckets[Math.floor(h / 6)]++;
+    });
+    const hourConsistency = this.hourConsistencyScore(hourBuckets);
+
+    return (frequency + recency + dayConsistency + hourConsistency) / 4;
+  }
+
+  /**
+   * Converte distribuição em 4 turnos de 6h em score 0..1.
+   * 1 = atividade concentrada em poucos turnos (rotina consistente).
+   * 0 = atividade totalmente espalhada (padrão errático).
+   */
+  private hourConsistencyScore(buckets: number[]): number {
+    const total = buckets.reduce((a, b) => a + b, 0);
+    if (total === 0) return 0;
+    const probs = buckets.map((c) => c / total).filter((p) => p > 0);
+    // Entropia de Shannon normalizada (máx = log2(4) = 2)
+    const entropy = -probs.reduce((acc, p) => acc + p * Math.log2(p), 0);
+    const normalized = entropy / 2;
+    return 1 - normalized;
   }
 
   private noDataResult(): ScoreResult {
