@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AreaChart,
@@ -34,6 +35,12 @@ export function ScorePage() {
     mutationFn: scoreService.calculate,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['score'] }),
   });
+
+  // Auto-recalcula ao entrar na página — elimina necessidade de clicar manualmente
+  useEffect(() => {
+    recalc.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isLoading) {
     return (
@@ -94,17 +101,22 @@ export function ScorePage() {
             Análise comportamental baseada em 5 dimensões ponderadas
           </p>
         </div>
-        <button
-          onClick={() => recalc.mutate()}
-          disabled={recalc.isPending}
-          className="btn-secondary text-sm"
-        >
-          <RefreshCw
-            size={16}
-            className={recalc.isPending ? 'animate-spin' : ''}
-          />
-          Recalcular
-        </button>
+        <div className="flex items-center gap-3">
+          {recalc.isPending && (
+            <span className="text-xs text-nan-gray flex items-center gap-1">
+              <RefreshCw size={13} className="animate-spin" />
+              Atualizando...
+            </span>
+          )}
+          <button
+            onClick={() => recalc.mutate()}
+            disabled={recalc.isPending}
+            title="Atualizar score manualmente"
+            className="btn-ghost text-sm p-2"
+          >
+            <RefreshCw size={16} className={recalc.isPending ? 'animate-spin opacity-50' : ''} />
+          </button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6 mb-6">

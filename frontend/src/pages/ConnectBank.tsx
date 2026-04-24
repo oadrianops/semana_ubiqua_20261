@@ -57,7 +57,20 @@ export function ConnectBankPage() {
 
   const disconnectMutation = useMutation({
     mutationFn: (id: string) => openFinanceService.disconnect(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['connections'] }),
+    onMutate: (id) => {
+      // Remove imediatamente do cache para a UI atualizar sem esperar o servidor
+      qc.setQueryData<typeof connections>(['connections'], (old = []) =>
+        old.filter((c) => c.id !== id)
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['connections'] });
+      qc.invalidateQueries({ queryKey: ['score'] });
+    },
+    onError: () => {
+      // Em caso de falha, restaura a lista buscando do servidor
+      qc.invalidateQueries({ queryKey: ['connections'] });
+    },
   });
 
   async function handleConnect() {
