@@ -29,3 +29,4 @@ Thumbs.db
 # Prisma generated
 backend/prisma/generated/
 */prisma/migrations/dev.db*
+CLAUDE.md
