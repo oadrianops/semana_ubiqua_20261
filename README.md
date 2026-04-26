@@ -445,6 +445,7 @@ nandesk/
 ## 📄 Licença
 
 MIT — use, modifique, distribua livremente.
+O uso no nome NanDesk é
 
 ---
 

@@ -56,7 +56,7 @@ Cenário: Open Finance
 *(clicar em Conectar Banco → selecionar banco → aceitar consentimento)*
 
 **Passo 3 — NanScore (30s)**
-> "Em segundos, o algoritmo analisa o histórico de transações e calcula o NanScore — de 0 a 1000. O João tem 847 pontos."
+> "Em segundos, o algoritmo analisa o histórico de transações e calcula o NanScore — de 0 a 1000. O João tem 713 pontos."
 
 *(clicar em Calcular Score)*
 
@@ -150,4 +150,4 @@ Cenário: Open Finance
 
 ---
 
-*Roteiro preparado por [Nome do Integrante] — Hackathon Semana Ubíqua, UNAMA 2026*
+*Roteiro preparado por Erick Seixas — Hackathon Semana Ubíqua, UNAMA 2026*
