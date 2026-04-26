@@ -445,7 +445,8 @@ nandesk/
 ## 📄 Licença
 
 MIT — use, modifique, distribua livremente.
-O uso no nome NanDesk é
+**NanDesk** é uma marca registrada com pedido de registro depositado no INPI 
+(Instituto Nacional da Propriedade Industrial). O uso do nome está reservado aos detentores do pedido de registro (Adriano Pinheiro da Silva).
 
 ---
 
